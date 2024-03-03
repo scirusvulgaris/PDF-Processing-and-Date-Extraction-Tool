@@ -8,7 +8,7 @@ Key features include:
 - **Automated File Organization**: Automatically sorts documents into folders based on the extracted dates, arranging them by year and month for easy retrieval. This process is fully automated, drastically reducing the time and effort required for file management.
 - **Versatile Document Handling**: Capable of processing both text-based and image-based PDFs thanks to integrated OCR technology, ensuring comprehensive coverage across all types of documents.
 
-This tool is designed to significantly reduce the manual workload associated with document sorting and archiving, making it an indispensable asset for businesses, researchers, and anyone dealing with large volumes of PDF documents.
+This tool is designed to significantly reduce the manual workload associated with invoice sorting, making it an indispensable asset for businesses, researchers, and anyone dealing with large volumes of PDF documents.
 
 ## Dependencies
 
