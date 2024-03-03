@@ -52,7 +52,7 @@ Undesired words must be added in the code source directly for now
 ## System Requirements
 
 - **Python 3.x**: Ensure Python 3.x is installed on your system.
-- **RAM**: OCR processing, especially on image-heavy PDF files, can be memory-intensive. We recommend having at least 8 GB of RAM for optimal performance, though more may be required for processing large volumes of documents or very large files.
+- **RAM**: OCR processing, especially on image-heavy PDF files, can be memory-intensive. We recommend having at least 16 GB of RAM for optimal performance, though more may be required for processing large volumes of documents or very large files.
 
 ## Performance Considerations
 
