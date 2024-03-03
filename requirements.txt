@@ -1,0 +1,4 @@
+easyocr
+pdfplumber
+Pillow
+numpy
