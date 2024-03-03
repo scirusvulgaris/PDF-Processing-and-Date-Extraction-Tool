@@ -1,4 +1,4 @@
- # PDF Processing and Date Extraction Tool
+# PDF Processing and Date Extraction Tool
 
 This advanced tool streamlines the management of PDF documents by automatically extracting dates and keywords to organize files efficiently, eliminating the need for manual triaging. It leverages Optical Character Recognition (OCR) technology to read text from PDF files—even those that are image-based—ensuring that no document is overlooked due to its format. The tool intelligently sorts documents into directories based on the year and month extracted from their content, creating an organized archive without manual intervention.
 
