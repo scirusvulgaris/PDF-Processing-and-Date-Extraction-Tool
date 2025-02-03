@@ -14,16 +14,6 @@ This tool is designed to significantly reduce the manual workload associated wit
 
 Ensure you have Python 3.x installed on your system. This tool depends on several Python libraries which are listed in the `requirements.txt` file.
 
-## Installation
-
-1. Clone the repository or download the tool's source code to your local machine.
-2. Navigate to the tool's directory in your terminal or command prompt.
-3. Install the required dependencies by running:
-
-
-pip install -r requirements.txt
-
-
 ## Usage
 
 1. **Setup**: Place the script in the directory with your PDF files.
@@ -31,7 +21,9 @@ pip install -r requirements.txt
 3. **Execution**: Run the script with optional year and keywords arguments.
 
 
-python script_name.py [year] [additional keywords to be matched]
+```
+python pdf_sort.py [year] [additional keywords to be matched]
+```
 
 [year] pdfs with given year will be triaged
 Undesired words must be added in the code source directly for now
