@@ -2,4 +2,4 @@ easyocr
 pdfplumber
 Pillow
 numpy
-frontend
+PyMuPDF==1.23.8
