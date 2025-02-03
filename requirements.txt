@@ -2,3 +2,4 @@ easyocr
 pdfplumber
 Pillow
 numpy
+frontend
