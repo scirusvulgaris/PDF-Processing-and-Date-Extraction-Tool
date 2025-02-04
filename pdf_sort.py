@@ -127,14 +127,17 @@ def contains_undesired_keywords(text, specific_keywords=["ceci n'est pas une fac
 def contains_desired_keywords(text, specific_keywords=["facture", "invoice", "rechnung", "facturation", "repas"]):
     return any(keyword.lower() in text for keyword in specific_keywords)
 
-
 def process_pdf_file(filepath, year, keywords, unsorted_files):
-    reader = easyocr.Reader(['en'])  # Initialize EasyOCR reader for English language
+    # Skip if file doesn't exist
+    if not os.path.exists(filepath):
+        print(f"Skipping non-existent file: {filepath}")
+        return
+
+    reader = easyocr.Reader(['en'])
     text = ""
     try:
         with fitz.open(filepath) as pdf:
             for page_number, page in enumerate(pdf):
-                # Attempt to extract text with fitz
                 page_text = page.get_text()
                 if page_text:
                     text += page_text.replace('\n', ' ').lower()
@@ -146,43 +149,40 @@ def process_pdf_file(filepath, year, keywords, unsorted_files):
                         xref = img[0]
                         base_image = pdf.extract_image(xref)
                         image_bytes = base_image["image"]
-                        # Convert bytes to PIL Image for EasyOCR
                         image = Image.open(io.BytesIO(image_bytes))
-                        # Resize the image to reduce its quality for faster OCR
                         image = image.resize((image.width // 2, image.height // 2), Image.Resampling.LANCZOS)
-                        # Convert PIL Image to NumPy array
                         image_np = np.array(image)
                         ocr_result = reader.readtext(image_np, detail=0, paragraph=True)
                         text += ' '.join(ocr_result).replace('\n', ' ').lower()
                         month, year = extract_date_from_text(text)
                         if month and (any(keyword.lower() in text for keyword in keywords) or contains_desired_keywords(text)):
-                            # print(f"[*]OCR Found date {BOLD_GREEN}{month} {year_extracted}{RESET} and {BLUE}{keywords}{RESET}")
                             break
-            month, year_extracted = extract_date_from_text(text)
-            # if month:
-            #     print(f"Found date {BOLD_GREEN}{month} {year_extracted}{RESET} and keyword")
-            # w = contains_desired_keywords(text)
-            # if (any(keyword.lower() in text for keyword in keywords) or contains_desired_keywords(text)):
-            #     print(f"Found keyword {BOLD_YELLOW}{w}{RESET} {GREEN}{text[:100]}{RESET}")
+
             if contains_undesired_keywords(text):
                 target_folder_path = os.path.join(os.getcwd(), "commande")
+                os.makedirs(target_folder_path, exist_ok=True)
                 target_file_path = construct_target_file_path(target_folder_path, filepath)
-                shutil.move(filepath, target_file_path)
-                print(f"Moved {YELLOW}'{os.path.basename(filepath)}'{RESET} to {BLUE}'commande'.{RESET}")
+                try:
+                    shutil.move(filepath, target_file_path)
+                    print(f"Moved {YELLOW}'{os.path.basename(filepath)}'{RESET} to {BLUE}'commande'.{RESET}")
+                except:
+                    print(f"Failed to move {filepath} to commande folder")
             elif any(keyword.lower() in text for keyword in keywords) or contains_desired_keywords(text):
                 month, year_extracted = extract_date_from_text(text)
-                # print(f"Here's {RED}function process_pdf and {YELLOW}{month}, {year_extracted}{RESET}, {text[:50]}\n")
                 if not month:
                     unsorted_files.append(filepath)
                     return
                 target_folder_path = os.path.join(os.getcwd(), str(year_extracted), "Facture fournisseur", f"{month:02d}")
                 os.makedirs(target_folder_path, exist_ok=True)
                 target_file_path = construct_target_file_path(target_folder_path, filepath)
-                shutil.move(filepath, target_file_path)
-                print(f"Moved '{GREEN}{os.path.basename(filepath)}'{RESET} to {BLUE}'{month} {year_extracted}'.{RESET}")
+                try:
+                    shutil.move(filepath, target_file_path)
+                    print(f"Moved '{GREEN}{os.path.basename(filepath)}'{RESET} to {BLUE}'{month} {year_extracted}'.{RESET}")
+                except:
+                    print(f"Failed to move {filepath}")
     except Exception as e:
         print(f"Error processing file '{filepath}': {e}")
-        traceback.print_exc()  # This prints the stack trace to stderr
+        traceback.print_exc()
         unsorted_files.append(filepath)
 
 
@@ -227,6 +227,50 @@ def delete_empty_folders(directory, max_depth=2):
             # print(f"{RED}Deleting empty folder: {root}{RESET}")
             os.rmdir(root)
 
+def count_pdf_files(directory, max_depth=2):
+    pdf_count = 0
+    total_size = 0
+    pdf_files = []
+    year_pattern = re.compile(r'^20\d{2}$')
+
+    print(f"\n{BOLD_CYAN}Scanning directory for PDF files...{RESET}")
+
+    for root, dirs, files in os.walk(directory):
+        current_level = root.count(os.path.sep)
+        start_level = directory.rstrip(os.path.sep).count(os.path.sep)
+
+        if current_level - start_level > max_depth:
+            dirs[:] = []
+        else:
+            dirs[:] = [d for d in dirs if d.lower() != "commande" and not year_pattern.fullmatch(d)]
+            for file in files:
+                if file.lower().endswith('.pdf'):
+                    full_path = os.path.join(root, file)
+                    if os.path.exists(full_path):
+                        pdf_count += 1
+                        file_size = os.path.getsize(full_path)
+                        total_size += file_size
+                        pdf_files.append((full_path, file_size))
+
+    # Convert total size to readable format
+    size_str = ""
+    if total_size < 1024:
+        size_str = f"{total_size} bytes"
+    elif total_size < 1024 * 1024:
+        size_str = f"{total_size/1024:.2f} KB"
+    else:
+        size_str = f"{total_size/(1024*1024):.2f} MB"
+
+    print(f"{BOLD_GREEN}Found {pdf_count} PDF files{RESET} (Total size: {BOLD_YELLOW}{size_str}{RESET})")
+
+    # Sort files by size and show the largest ones
+    if pdf_files:
+        print(f"\n{BOLD_CYAN}Largest files:{RESET}")
+        for path, size in sorted(pdf_files, key=lambda x: x[1], reverse=True)[:3]:
+            size_mb = size/(1024*1024)
+            print(f"{BLUE}{os.path.basename(path)}{RESET}: {YELLOW}{size_mb:.2f} MB{RESET}")
+
+    return pdf_count, pdf_files
 
 if __name__ == "__main__":
     keywords = ["facture", "invoice", "fechnung"]
@@ -237,20 +281,46 @@ if __name__ == "__main__":
     else:
         keywords += [keyword.lower() for keyword in sys.argv[1:]]
 
+    # Count files first
+    total_files, pdf_files = count_pdf_files(os.getcwd())
+
+    if total_files == 0:
+        print(f"{RED}No PDF files found in the directory.{RESET}")
+        sys.exit(1)
+
+    # Ask for confirmation
+    response = input(f"\n{BOLD_YELLOW}Do you want to proceed with processing {total_files} files? (y/n): {RESET}")
+    if response.lower() != 'y':
+        print(f"{RED}Operation cancelled by user.{RESET}")
+        sys.exit(0)
+
+    print(f"\n{BOLD_GREEN}Starting processing...{RESET}")
+
     unzip_files_in_directory(os.getcwd())
-    pdf_files = find_pdf_files(os.getcwd())
     unsorted_files = []
 
-    with ThreadPoolExecutor(max_workers=(os.cpu_count() or 1)) as executor:
-        futures = {executor.submit(process_pdf_file, pdf, year, keywords, unsorted_files): pdf for pdf in pdf_files}
-        for future in as_completed(futures):
-            pass
+    # Create progress counter
+    processed_files = 0
 
+    with ThreadPoolExecutor(max_workers=(os.cpu_count() or 1)) as executor:
+        futures = {executor.submit(process_pdf_file, pdf[0], year, keywords, unsorted_files): pdf[0]
+                  for pdf in pdf_files}
+
+        for future in as_completed(futures):
+            processed_files += 1
+            # Calculate percentage
+            percentage = (processed_files / total_files) * 100
+            print(f"\r{BOLD_CYAN}Progress: {percentage:.1f}% ({processed_files}/{total_files}){RESET}",
+                  end='', flush=True)
+
+    print("\n")  # New line after progress
     delete_empty_folders(os.getcwd(), max_depth=2)
 
     if unsorted_files:
-        print(f"\n{YELLOW}The following PDF files could not be sorted:{RESET}")
+        print(f"\n{YELLOW}The following PDF files could not be sorted ({len(unsorted_files)} files):{RESET}")
         for filepath in unsorted_files:
             print(f"{filepath}")
     else:
-        print(f"\n{CYAN}All PDF files have been sorted.{RESET}")
+        print(f"\n{CYAN}All PDF files have been sorted successfully.{RESET}")
+
+
