@@ -42,9 +42,9 @@ RESET = '\033[0m'  # Reset to default color
 
 def extract_month_from_french(text):
     months_french = {
-        'janvier': 1, 'février': 2, 'mars': 3, 'avril': 4,
-        'mai': 5, 'juin': 6, 'juillet': 7, 'août': 8,
-        'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12
+        'janvier': 1, 'février': 2, 'f´evrier':2 , 'mars': 3, 'avril': 4,
+        'mai': 5, 'juin': 6, 'juillet': 7, 'août': 8,'aoˆut': 8, 
+        'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12, 'd´ecembre': 12
     }
     for month, number in months_french.items():
         if month in text.lower():
@@ -55,65 +55,188 @@ def extract_month_from_french(text):
     return None
 
 
+import re
+from datetime import datetime
+
+# French month dictionary for day-month-year patterns and fallback detection
+FRENCH_MONTHS = {
+    # Normalize them to handle accent combos in real texts
+    # (suggesting you standardize text by removing weird accent marks)
+    'janvier': 1, 'février': 2, 'f´evrier': 2, 'fevrier': 2,
+    'mars': 3, 'avril': 4, 'mai': 5, 'juin': 6,
+    'juillet': 7,
+    'août': 8, 'aoˆut': 8, 'aout': 8,
+    'septembre': 9, 'octobre': 10, 'novembre': 11,
+    'décembre': 12, 'decembre': 12, 'd´ecembre': 12
+}
+
+
 def extract_date_from_text(text):
-    # Define a reasonable year range for validation
+
     current_year = datetime.now().year
-    min_year = 1900  # Minimum year considered valid
-    max_year = current_year + 1  # Allow current year and next year as valid to handle future-dated documents
+    min_year = 1900
+    max_year = current_year + 1
 
-    date_formats = [
-        # Note: Added stricter day and month checks in regex could be done, but left as is for clarity
-        # r'\b(0[1-9]|[1-2][0-9]|3[01]).(0[1-9]|1[0-2]).(20[0-9]{2})\b'      # Format any type where dd mm yyyy; but will produce false positive results
-        r'(\b(0[1-9]|[1-2][0-9]|3[01])/(0[1-9]|1[0-2])/(20[0-9]{2}).*?)',    # Format: dd/mm/yyyy
-        r'\b(0[1-9]|[1-2][0-9]|3[01])\.(0[1-9]|1[0-2])\.(20[0-9]{2}).*?',    # Format: dd.mm.yyyy
-        r'\b(0[1-9]|[1-2][0-9]|3[01])\ (0[1-9]|1[0-2])\ (20[0-9]{2}).*?',    # Format: dd mm yyyy
-        r'\b(0[1-9]|[1-2][0-9]|3[01])\-(0[1-9]|1[0-2])\-(20[0-9]{2}).*?',    # Format: dd-mm-yyyy
-        r'\b(20[0-9]{2})\-(0[1-9]|1[0-2])\-(0[1-9]|[12][0-9]|3[01]).*?',     # Format: yyyy-mm-dd
-
-        # r'\b(0[1-9]|[1-2][0-9]|3[01]).(0[1-9]|1[0-2]).(?:[0-9]{2})\b',     # Format any type where dd mm yy
-        r'(\b(0[1-9]|[1-2][0-9]|3[01])\ (0[1-9]|1[0-2])\ (?:[0-9]{2}).*?)',  # Format: dd mm yy
-        r'\b(0[1-9]|[1-2][0-9]|3[01])\.(0[1-9]|1[0-2])\.(?:[0-9]{2}).*?',    # Format: dd.mm.yy
-        r'(\b(0[1-9]|[1-2][0-9]|3[01])/(0[1-9]|1[0-2])/(?:[0-9]{2}).*?)',    # Format: dd/mm/yy
-
-        r'(\b(0[1-9]|[1-2][0-9]|3[01])\s[A-Za-z]{3}\.?\s(20[0-9]{2}).*?)'      # Format: 13 Jul 2023 or [with a dot] 13 Jul. 2023
-        r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\ (0[1-9]|1[0-2])\,\ (20[0-9]{2}).*?'
+    # ========== 1) Numeric Patterns ==========
+    numeric_patterns = [
+        # dd/mm/yyyy
+        r'\b([0-3]\d)/([0-1]\d)/(20[0-9]{2})\b',
+        # dd-mm-yyyy
+        r'\b([0-3]\d)-([0-1]\d)-(20[0-9]{2})\b',
+        # dd.mm.yyyy
+        r'\b([0-3]\d)\.([0-1]\d)\.(20[0-9]{2})\b',
+        # yyyy-mm-dd
+        r'\b(20[0-9]{2})-([0-1]\d)-([0-3]\d)\b',
+        # dd/mm/yy (two digits for year)
+        r'\b([0-3]\d)/([0-1]\d)/([0-9]{2})\b',
     ]
 
-    for date_format in date_formats:
-        date_match = re.search(date_format, text)
-        # print(f"Here's function {BOLD_GREEN}extract_date_from_text and {BLUE}{date_match}{RESET}, {text[:50]}\n")
-        if date_match:
-            # print(f"Here's function {BOLD_GREEN}extract_date_from_text and {BLUE}{date_match}{RESET}, {text[:50]}\n")
-            for fmt in ('%d/%m/%Y', '%d.%m.%Y', '%d.%m.%y', '%d %m %Y', '%d %b %Y', '%Y-%m-%d'):
-                try:
-                    date_obj = datetime.strptime(date_match.group(0), fmt)
-                    # Adjust year for two-digit formats to handle the century correctly
-                    if fmt.endswith('%y'):
-                        # print(fmt.endswith('%y'))
-                        year = 2000 + (date_obj.year % 100)  # Adjust for yy format assuming 2000s
-                    else:
-                        print
-                        year = date_obj.year
+    for pattern in numeric_patterns:
+        m = re.search(pattern, text)
+        if m:
+            # We expect exactly 3 capturing groups from each pattern
+            groups = m.groups()
+            date_obj = try_parse_numeric(groups, min_year, max_year)
+            if date_obj:
+                return date_obj.month, date_obj.year
 
-                    # Validate the year to ensure it's within a reasonable range
-                    if min_year <= year <= max_year:
-                        # print(f"here is date found : {date_obj.month}, {year}")
-                        return date_obj.month, year
-                    else:
-                        # print(f"Found an unrealistic year: {year}. Skipping this date.")
-                        continue  # Skip this date match and continue searching
-                except ValueError:
-                    continue
+    english_patterns = [
+        # Pattern A: Month day, year  (e.g. "October 6, 2024" or "Oct 6, 2024")
+        r'\b((January|February|March|April|May|June|July|August|September|October|November|December)|'
+        r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec))\s+(\d{1,2}),\s*(20[0-9]{2})\b',
 
-    # Check for French month names if no standard date format is found
-    french_date = extract_month_from_french(text)
-    if french_date:
-        try:
-            date_obj = datetime.strptime(french_date, "%d/%m/%Y")
+        # Pattern B: day Month year  (e.g. "6 October 2024" or "13 Jul 2024")
+        r'\b(\d{1,2})\s+((January|February|March|April|May|June|July|August|September|October|November|December)|'
+        r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec))\s+(20[0-9]{2})\b'
+    ]
+
+    for pattern in english_patterns:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            date_obj = try_parse_english(m, min_year, max_year)
+            if date_obj:
+                return date_obj.month, date_obj.year
+
+    french_pattern = (
+        r'\b(\d{1,2})\s+('
+        r'jan(?:vier)?|f[ée]v(?:rier)?|f´ev(?:rier)?|mars|avr(?:il)?|mai|juin|juil(?:let)?|ao[ûˆu]t|sept(?:embre)?|oct(?:obre)?|'
+        r'nov(?:embre)?|d[ée]c(?:embre)?|d´ec(?:embre)?'
+        r')\s+(20\d{2})\b'
+    )
+    match_fr = re.search(french_pattern, text, re.IGNORECASE)
+    if match_fr:
+        date_obj = try_parse_french(match_fr, min_year, max_year)
+        if date_obj:
             return date_obj.month, date_obj.year
+
+    # ========== 4) Fallback: Only French month + year (no day) ==========
+
+    fallback_str = extract_month_from_french(text)
+    if fallback_str:
+        try:
+            date_obj = datetime.strptime(fallback_str, "%d/%m/%Y")
+            if min_year <= date_obj.year <= max_year:
+                print(f"here is date found via fallback: {date_obj.month}, {date_obj.year}")
+                return date_obj.month, date_obj.year
         except ValueError:
             pass
+
+    # If no date recognized at all
     return None, None
+
+
+def try_parse_numeric(groups, min_year, max_year):
+    """
+    Decide if it is 'dd/mm/yyyy' or 'yyyy-mm-dd' based on which group starts with '20'.
+    Return datetime object or None.
+    """
+    try:
+        if groups[0].startswith('20'):
+            # pattern is likely yyyy-mm-dd
+            yyyy = int(groups[0])
+            mm = int(groups[1])
+            dd = int(groups[2])
+        elif groups[-1].startswith('20'):
+            # pattern is dd/mm/yyyy
+            dd = int(groups[0])
+            mm = int(groups[1])
+            yyyy = int(groups[2])
+        else:
+            # 2-digit year => e.g. dd / mm / yy
+            dd = int(groups[0])
+            mm = int(groups[1])
+            yy = int(groups[2])
+            yyyy = 2000 + int(yy)  # assume 20xx for 2-digit year
+
+        candidate = datetime(yyyy, mm, dd)
+        if min_year <= yyyy <= max_year:
+            print(f"Parsed numeric date => {candidate}")
+            return candidate
+    except ValueError:
+        pass  # e.g. invalid date (32nd day, etc.)
+    return None
+
+
+def try_parse_english(match_obj, min_year, max_year):
+    matched_text = match_obj.group(0)
+    for fmt in ('%B %d, %Y', '%b %d, %Y', '%d %B %Y', '%d %b %Y'):
+        try:
+            candidate = datetime.strptime(matched_text, fmt)
+            yyyy = candidate.year
+            if min_year <= yyyy <= max_year:
+                print(f"Parsed English date => {candidate}")
+                return candidate
+        except ValueError:
+            continue
+    return None
+
+
+def try_parse_french(match_obj, min_year, max_year):
+
+    day_str = match_obj.group(1)
+    month_word = match_obj.group(2).lower().replace('´', '').replace('ˆ', '')  # normalize
+    year_str = match_obj.group(3)
+
+    try:
+        day = int(day_str)
+        year = int(year_str)
+
+        # map to numeric month:
+        month_num = None
+        for k, v in FRENCH_MONTHS.items():
+            if month_word.startswith(k):
+                month_num = v
+                break
+
+        if month_num is None:
+            return None  # Unrecognized month
+
+        candidate = datetime(year, month_num, day)
+        if min_year <= year <= max_year:
+            print(f"Parsed French date => {candidate}")
+            return candidate
+    except ValueError:
+        pass
+    return None
+
+
+def extract_month_from_french(text):
+
+    months_french = {
+        'janvier': 1, 'février': 2, 'f´evrier': 2, 'mars': 3, 'avril': 4,
+        'mai': 5, 'juin': 6, 'juillet': 7, 'août': 8, 'aoˆut': 8,
+        'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12, 'd´ecembre': 12
+    }
+    # Normalize
+    lower_text = text.lower().replace('´', '').replace('ˆ', '')
+
+    for month_word, number in months_french.items():
+        if month_word in lower_text:
+            words = lower_text.split()
+            year = next((int(word) for word in words if word.isdigit() and len(word) == 4), None)
+            if year:
+                return f"01/{number:02d}/{year}"
+    return None
 
 
 def generate_random_suffix(size=3, chars=string.ascii_letters + string.digits):
@@ -124,7 +247,7 @@ def contains_undesired_keywords(text, specific_keywords=["ceci n'est pas une fac
     return any(keyword.lower() in text for keyword in specific_keywords)
 
 
-def contains_desired_keywords(text, specific_keywords=["facture", "invoice", "rechnung", "facturation", "repas"]):
+def contains_desired_keywords(text, specific_keywords=["facture", "Invoice", "rechnung", "facturation", "repas"]):
     return any(keyword.lower() in text for keyword in specific_keywords)
 
 def process_pdf_file(filepath, year, keywords, unsorted_files):
@@ -252,23 +375,7 @@ def count_pdf_files(directory, max_depth=2):
                         total_size += file_size
                         pdf_files.append((full_path, file_size))
 
-    # Convert total size to readable format
-    size_str = ""
-    if total_size < 1024:
-        size_str = f"{total_size} bytes"
-    elif total_size < 1024 * 1024:
-        size_str = f"{total_size/1024:.2f} KB"
-    else:
-        size_str = f"{total_size/(1024*1024):.2f} MB"
-
-    print(f"{BOLD_GREEN}Found {pdf_count} PDF files{RESET} (Total size: {BOLD_YELLOW}{size_str}{RESET})")
-
-    # Sort files by size and show the largest ones
-    if pdf_files:
-        print(f"\n{BOLD_CYAN}Largest files:{RESET}")
-        for path, size in sorted(pdf_files, key=lambda x: x[1], reverse=True)[:3]:
-            size_mb = size/(1024*1024)
-            print(f"{BLUE}{os.path.basename(path)}{RESET}: {YELLOW}{size_mb:.2f} MB{RESET}")
+    print(f"{BOLD_GREEN}Found{RESET} {BOLD_CYAN}{pdf_count}{RESET} {BOLD_GREEN}PDF files{RESET}")
 
     return pdf_count, pdf_files
 
@@ -287,12 +394,6 @@ if __name__ == "__main__":
     if total_files == 0:
         print(f"{RED}No PDF files found in the directory.{RESET}")
         sys.exit(1)
-
-    # Ask for confirmation
-    response = input(f"\n{BOLD_YELLOW}Do you want to proceed with processing {total_files} files? (y/n): {RESET}")
-    if response.lower() != 'y':
-        print(f"{RED}Operation cancelled by user.{RESET}")
-        sys.exit(0)
 
     print(f"\n{BOLD_GREEN}Starting processing...{RESET}")
 
@@ -322,5 +423,3 @@ if __name__ == "__main__":
             print(f"{filepath}")
     else:
         print(f"\n{CYAN}All PDF files have been sorted successfully.{RESET}")
-
-
